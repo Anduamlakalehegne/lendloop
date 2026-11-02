@@ -506,14 +506,37 @@ export function Dashboard() {
                 <X size={22} />
               </button>
               <div className="eyebrow" style={{ color: "#b91c1c" }}>
-                CONFIRM REMOVAL
+                {me.isAdmin ? "ADMIN MODERATION" : "CONFIRM REMOVAL"}
               </div>
-              <h2 id="modal-title">Remove listing?</h2>
+              <h2 id="modal-title">
+                {me.isAdmin ? "Remove listing (Admin)" : "Remove your listing?"}
+              </h2>
               <p>
-                Are you sure you want to remove <strong>{selected?.name}</strong>?
-                Pending borrow requests will be cancelled, and active or past loan
-                records will be safely preserved in history.
+                {me.isAdmin ? (
+                  <>
+                    Are you sure you want to remove <strong>{selected?.name}</strong>?
+                    Any pending borrow requests will be cancelled automatically, and
+                    active or past loan records will be safely preserved in history.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to remove <strong>{selected?.name}</strong> from
+                    the neighborhood shelf? Any past loan history will be preserved.
+                    Outstanding requests and active loans must be resolved before removal.
+                  </>
+                )}
               </p>
+              {!me.isAdmin &&
+                loans?.some(
+                  (l) =>
+                    l.toolId === selected?._id &&
+                    (l.status === "pending" || l.status === "approved"),
+                ) && (
+                  <div className="error" role="alert">
+                    This listing has active loans or pending requests. Please resolve them
+                    before removing this listing.
+                  </div>
+                )}
               {error && (
                 <div className="error" role="alert">
                   {error}
@@ -538,7 +561,17 @@ export function Dashboard() {
                 <button
                   type="button"
                   className="button danger"
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    (!me.isAdmin &&
+                      Boolean(
+                        loans?.some(
+                          (l) =>
+                            l.toolId === selected?._id &&
+                            (l.status === "pending" || l.status === "approved"),
+                        ),
+                      ))
+                  }
                   onClick={async () => {
                     if (!selected) return;
                     const ok = await run(

@@ -1,6 +1,6 @@
 "use client";
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
-import { ConvexReactClient } from "convex/react";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { useState } from "react";
 
@@ -15,13 +15,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
       : null,
   );
 
-  const content = client ? (
-    <ConvexProviderWithClerk client={client} useAuth={useAuth}>
-      {children}
-    </ConvexProviderWithClerk>
-  ) : (
-    children
-  );
+  let content = children;
+  if (client) {
+    content = hasClerk ? (
+      <ConvexProviderWithClerk client={client} useAuth={useAuth}>
+        {children}
+      </ConvexProviderWithClerk>
+    ) : (
+      <ConvexProvider client={client}>{children}</ConvexProvider>
+    );
+  }
 
   if (hasClerk) {
     return <ClerkProvider>{content}</ClerkProvider>;

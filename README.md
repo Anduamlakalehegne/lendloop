@@ -33,8 +33,8 @@ Open `http://localhost:3000`. Without keys, you see the clearly labeled public d
 5. In Convex deployment environment settings, set:
    - `CLERK_JWT_ISSUER_DOMAIN`: the Clerk issuer URL.
    - `ADMIN_SUBJECTS`: comma-separated Clerk user IDs for your administrators. These are **not emails or client-submitted roles**. Use a separate admin test account.
-   - `AUTOMATION_SECRET`: at least 32 cryptographically random characters. Generate locally with `openssl rand -hex 32` (or a secure password generator).
-   - `N8N_REQUEST_WEBHOOK_URL`: the active n8n production HTTPS URL, ending in `/webhook/lendloop-request`.
+   - `AUTOMATION_SECRET`: at least 32 cryptographically random characters. Generate locally with `openssl rand -hex 32` (or a secure password generator). Must match in Convex and n8n.
+   - `N8N_REQUEST_WEBHOOK_URL`: the active n8n webhook URL, ending in `/webhook/lendloop-request` (HTTPS required for remote production; HTTP `localhost` / `127.0.0.1` permitted for local development).
 6. Restart Next.js after changing public environment variables, and let `npx convex dev` sync the authentication configuration.
 
 All non-public queries and mutations independently check the Convex authenticated identity. Clerk UI visibility is not a security boundary. Without a configured issuer, authentication fails closed.
@@ -44,12 +44,12 @@ All non-public queries and mutations independently check the Convex authenticate
 Docker Compose reads **`.env`**, not `.env.local`. Create an ignored `.env` containing only:
 
 ```dotenv
-CONVEX_SITE_URL=https://YOUR-DEPLOYMENT.convex.site
-AUTOMATION_SECRET=YOUR_RANDOM_SHARED_SECRET
+CONVEX_SITE_URL=http://host.docker.internal:3211 # Use https://YOUR-DEPLOYMENT.convex.site for hosted Convex
+AUTOMATION_SECRET=YOUR_RANDOM_SHARED_SECRET_AT_LEAST_32_CHARS
 N8N_ENCRYPTION_KEY=ANOTHER_LONG_RANDOM_SECRET
 ```
 
-Use the same `AUTOMATION_SECRET` on Convex and n8n. Keep the encryption key stable across container restarts. The `.convex.site` URL is for HTTP actions; `.convex.cloud` is the React client URL.
+Use the exact same `AUTOMATION_SECRET` on Convex and n8n (minimum 32 characters enforced). Keep the encryption key stable across container restarts. The `.convex.site` URL is for HTTP actions; `.convex.cloud` is the React client URL.
 
 ```bash
 docker compose up -d

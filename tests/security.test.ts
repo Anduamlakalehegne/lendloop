@@ -4,6 +4,7 @@ import schema from "../convex/schema";
 import { api, internal } from "../convex/_generated/api";
 import { sign, verify } from "../lib/signatures";
 import { dateRange, overlaps } from "../lib/rules";
+import { validateWebhookUrl } from "../convex/delivery";
 const modules = import.meta.glob("../convex/**/*.ts");
 const listing = {
   name: "Drill",
@@ -347,4 +348,47 @@ it("allows admin archival with active loans while preserving return and history"
   expect(
     (await o.query(api.loans.list, {})).find((l) => l._id === active)?.status,
   ).toBe("returned");
+});
+
+describe("Webhook destination validation", () => {
+  it("permits local loopback HTTP destinations for development", () => {
+    expect(
+      validateWebhookUrl("http://localhost:5678/webhook/lendloop-request").href,
+    ).toBe("http://localhost:5678/webhook/lendloop-request");
+    expect(
+      validateWebhookUrl("http://127.0.0.1:5678/webhook/lendloop-request").href,
+    ).toBe("http://127.0.0.1:5678/webhook/lendloop-request");
+  });
+
+  it("permits remote HTTPS destinations for production", () => {
+    expect(
+      validateWebhookUrl("https://n8n.example.com/webhook/lendloop-request")
+        .href,
+    ).toBe("https://n8n.example.com/webhook/lendloop-request");
+  });
+
+  it("rejects unencrypted remote HTTP destinations", () => {
+    expect(() =>
+      validateWebhookUrl("http://n8n.example.com/webhook/lendloop-request"),
+    ).toThrow("Use an HTTPS n8n webhook URL");
+  });
+
+  it("rejects loopback hostname spoofing attempts", () => {
+    expect(() =>
+      validateWebhookUrl(
+        "http://localhost.evil.com/webhook/lendloop-request",
+      ),
+    ).toThrow("Use an HTTPS n8n webhook URL");
+    expect(() =>
+      validateWebhookUrl(
+        "http://127.0.0.1.attacker.com/webhook/lendloop-request",
+      ),
+    ).toThrow("Use an HTTPS n8n webhook URL");
+  });
+
+  it("rejects malformed URLs", () => {
+    expect(() => validateWebhookUrl("not-a-valid-url")).toThrow(
+      "Invalid N8N_REQUEST_WEBHOOK_URL",
+    );
+  });
 });

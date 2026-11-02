@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { configured, hasClerk } from "@/components/providers";
+import { configured, hasClerk, hasConvex } from "@/components/providers";
 import { CategoryIcon } from "@/components/tool-icon";
 import { Dashboard } from "@/components/dashboard";
 import { categories } from "@/lib/rules";
@@ -101,16 +101,24 @@ function PublicBoard({
             Turn the things sitting in your shed into a little
             <br className="desktop" /> more connection on your street.
           </p>
-          <Show when="signed-out">
+          {hasClerk ? (
+            <>
+              <Show when="signed-out">
+                <SignIn>
+                  Sign in to lend or borrow <ArrowUpRight size={18} />
+                </SignIn>
+              </Show>
+              <Show when="signed-in">
+                <a href="#browse" className="button primary">
+                  Browse neighborhood tools <ArrowRight size={18} />
+                </a>
+              </Show>
+            </>
+          ) : (
             <SignIn>
               Sign in to lend or borrow <ArrowUpRight size={18} />
             </SignIn>
-          </Show>
-          <Show when="signed-in">
-            <a href="#browse" className="button primary">
-              Browse neighborhood tools <ArrowRight size={18} />
-            </a>
-          </Show>
+          )}
           <div className="hero-foot">
             <span className="mini-icon">
               <HeartHandshake size={18} />
@@ -346,6 +354,8 @@ export default function Page() {
               <Dashboard />
             </Authenticated>
           </>
+        ) : hasConvex ? (
+          <LivePublic />
         ) : (
           <PublicBoard tools={samples} preview />
         )}
