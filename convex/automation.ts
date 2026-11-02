@@ -12,8 +12,8 @@ export const getEvent = internalQuery({
   handler: (ctx, { eventId }) => ctx.db.get(eventId),
 });
 export const failed = internalMutation({
-  args: { eventId: v.id("events") },
-  handler: async (ctx, { eventId }) => {
+  args: { eventId: v.id("events"), error: v.optional(v.string()) },
+  handler: async (ctx, { eventId, error }) => {
     const e = await ctx.db.get(eventId);
     if (!e || e.state === "delivered") return;
     const attempts = e.attempts + 1;
@@ -21,6 +21,7 @@ export const failed = internalMutation({
       attempts,
       state: attempts >= 5 ? "failed" : "queued",
       lastError:
+        error ??
         "Notification delivery failed. Check the n8n execution and configuration.",
     });
     if (attempts < 5)
@@ -119,8 +120,8 @@ export const retry = mutation({
   handler: async (ctx, { eventId }) => {
     await admin(ctx);
     const e = await ctx.db.get(eventId);
-    if (!e || e.state !== "failed")
-      throw new Error("Only failed events can be retried.");
+    if (!e || e.state === "delivered")
+      throw new Error("Delivered events cannot be retried.");
     await ctx.db.patch(eventId, {
       state: "queued",
       attempts: 0,

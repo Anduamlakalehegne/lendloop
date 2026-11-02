@@ -467,18 +467,18 @@ export function Dashboard() {
                 </small>
               </div>
               <span className="status">{e.state}</span>
-              {e.state === "failed" && (
+              {e.state !== "delivered" && (
                 <button
                   className="button small"
                   disabled={busy}
                   onClick={() =>
                     void run(
                       () => retry({ eventId: e._id }),
-                      "Delivery queued again.",
+                      "Delivery queued immediately.",
                     )
                   }
                 >
-                  Retry
+                  {e.state === "failed" ? "Retry" : "Deliver now"}
                 </button>
               )}
             </article>

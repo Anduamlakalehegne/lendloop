@@ -31,8 +31,12 @@ export const send = internalAction({
       });
       if (latest?.state !== "delivered")
         throw new Error("Workflow did not acknowledge the notification.");
-    } catch {
-      await ctx.runMutation(internal.automation.failed, { eventId });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await ctx.runMutation(internal.automation.failed, {
+        eventId,
+        error: msg,
+      });
     }
   },
 });
