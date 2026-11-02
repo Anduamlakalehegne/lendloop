@@ -50,6 +50,11 @@ function SignIn({
   ) : (
     <button
       className={className}
+      title={
+        hasConvex
+          ? "Sign-in requires Clerk credentials (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)"
+          : "Credentials not configured"
+      }
       onClick={() =>
         document
           .getElementById("preview-note")
@@ -206,10 +211,11 @@ function PublicBoard({
             />
           </label>
         </div>
-        {preview && (
+        {(!hasClerk || preview) && (
           <p className="preview-note" id="preview-note">
-            Design preview · Sample listings. Live sign-in and lending become
-            available after service configuration.
+            {!hasClerk && hasConvex
+              ? "Live neighborhood tools loaded from Convex. Sign-in and borrowing become active once Clerk credentials (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) are configured."
+              : "Design preview · Sample listings. Live sign-in and lending become available after service configuration."}
           </p>
         )}
         <div className="tool-grid">

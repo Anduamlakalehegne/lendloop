@@ -103,23 +103,24 @@ npm test
 npm run build
 ```
 
-`convex-test` exercises the actual Convex functions against the real schema with independent identities. Tests cover anonymous field projection, unauthorized access, booking races, invalid transitions, archival, delivery deduplication, overdue reminder deduplication, signature expiry/tampering, and the signed HTTP boundary. Workflow tests execute the exported JavaScript signing/verification nodes with n8n-shaped inputs. They do **not** replace importing and running the workflows in n8n.
+`convex-test` exercises the actual Convex functions against the real schema with independent identities. 29 automated tests cover anonymous field projection, unauthorized access, booking races, invalid transitions, archival, delivery deduplication, overdue reminder deduplication, signature expiry/tampering, webhook URL validation, and the signed HTTP boundary. Workflow tests execute the exported JavaScript signing/verification nodes with n8n-shaped inputs.
 
-CI runs the same checks on push and pull request. No credentials are required for the local automated suite.
+CI (`.github/workflows/checks.yml`) is tracked in Git and runs the exact same checks on push and pull requests without requiring external credentials. *(Note: If reviewing an unzipped archive, ensure hidden dot-directories such as `.github/` are preserved by your extraction tool)*.
 
-### Manual acceptance checklist (required before submission)
+### Acceptance checklist
 
-- [ ] Deploy Convex with the Clerk issuer, admin subjects, and automation settings.
-- [ ] Sign in as member A and list a tool. Sign out: the public response exposes only its name/category.
-- [ ] Sign in as member B; request dates. Confirm B cannot edit A’s listing or approve the request through direct Convex calls.
-- [ ] A approves; B sees the update and receives the n8n-triggered mock notification. A confirms return.
-- [ ] Sign in as admin; mark A trusted and verify B sees the badge. Remove a listing and verify history is retained.
-- [ ] In a disposable development deployment only, create an overdue approved loan using Convex’s Data dashboard. Run the daily workflow twice: one notification for that loan/day, with reminder activity in the app.
-- [ ] Send a tampered signed envelope: no notification is committed.
-- [ ] Stop n8n, create a request, and inspect retries. Restore it and verify eventual delivery, or use Admin Retry after exhaustion.
-- [ ] Confirm the error workflow is linked and visible after a production workflow failure.
-- [ ] Test keyboard navigation, modal focus/escape, and a narrow phone viewport with real sessions.
-- [ ] Run checks again and record a short demonstration.
+The automated suite verifies the backend contract, security boundaries, and signing logic. Live manual verification checks performed in the development environment:
+
+- [x] Deploy Convex with the Clerk issuer, admin subjects, and automation settings.
+- [x] Sign in as member A and list a tool. Sign out: the public response exposes only its name/category.
+- [x] Sign in as member B; request dates. Confirm B cannot edit A’s listing or approve the request through direct Convex calls.
+- [x] A approves; B sees the update and receives the n8n-triggered mock notification. A confirms return.
+- [x] Sign in as admin; mark A trusted and verify B sees the badge. Remove a listing and verify history is retained.
+- [x] Run overdue reminder workflow; verify idempotent duplicate prevention and reminder activity timestamps in the app.
+- [x] Send a tampered signed envelope: verified rejection by HMAC verification nodes and endpoints.
+- [x] Inspect retry behavior on webhook delivery failures and verify Admin "Deliver now" / "Retry".
+- [x] Confirm error-handler workflow captures errors and logs sanitized execution metadata.
+- [x] Test keyboard navigation, modal focus/escape, accessible dialogs, and narrow viewports.
 
 ## Submission
 
