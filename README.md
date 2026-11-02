@@ -49,7 +49,7 @@ flowchart TD
 
 ### 1. Install & Launch Preview
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Anduamlakalehegne/lendloop.git
 cd lendloop
 npm ci
 cp .env.example .env.local
