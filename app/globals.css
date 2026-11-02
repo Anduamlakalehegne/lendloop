@@ -724,6 +724,23 @@ footer > span:last-child {
 .availability.unavailable {
   color: #936833;
 }
+.tool-lender {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  font-size: 11px;
+  color: #636b5c;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tool-lender .trusted {
+  margin-top: 0;
+}
+.lender-name {
+  font-weight: 500;
+  color: #4b5545;
+}
 .trusted {
   display: flex;
   align-items: center;
@@ -1269,7 +1286,7 @@ footer > span:last-child {
   .tool-body > p {
     font-size: 11px;
   }
-  .trusted {
+    .trusted {
     font-size: 9px;
   }
 }

@@ -36,11 +36,15 @@ export const list = query({
       .withIndex("by_status", (q) => q.eq("status", "approved"))
       .collect();
     const today = new Date().toISOString().slice(0, 10);
-    return tools.map((t) => ({
-      ...t,
-      trusted: users.some((u) => u.subject === t.owner && u.trusted),
-      busy: loans.some((l) => l.toolId === t._id && l.start <= today),
-    }));
+    return tools.map((t) => {
+      const ownerUser = users.find((u) => u.subject === t.owner);
+      return {
+        ...t,
+        ownerName: ownerUser?.name ?? "Neighbor",
+        trusted: ownerUser?.trusted ?? false,
+        busy: loans.some((l) => l.toolId === t._id && l.start <= today),
+      };
+    });
   },
 });
 const fields = {

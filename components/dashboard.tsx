@@ -15,7 +15,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { CategoryIcon } from "@/components/tool-icon";
-type Tool = Doc<"tools"> & { trusted: boolean; busy: boolean };
+type Tool = Doc<"tools"> & {
+  trusted: boolean;
+  busy: boolean;
+  ownerName?: string;
+};
 export function Dashboard() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const me = useQuery(api.users.me, {}),
@@ -96,7 +100,27 @@ export function Dashboard() {
     <section className="dashboard" id="browse">
       <div className="dashboard-heading">
         <div>
-          <div className="eyebrow">YOUR NEIGHBORHOOD, CONNECTED</div>
+          <div
+            className="eyebrow"
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <span>YOUR NEIGHBORHOOD, CONNECTED</span>
+            <span
+              style={{
+                textTransform: "none",
+                fontSize: "11px",
+                fontWeight: 500,
+                color: me.isAdmin ? "#15803d" : "#78716c",
+                background: me.isAdmin ? "#ecfdf5" : "#f5f5f4",
+                padding: "2px 8px",
+                borderRadius: "999px",
+                border: me.isAdmin ? "1px solid #bbf7d0" : "1px solid #e7e5e4",
+              }}
+              title={`Clerk ID: ${me.subject}`}
+            >
+              {me.isAdmin ? "👑 Admin" : "👤 Member"}
+            </span>
+          </div>
           <h1>
             Hello, {me.name.split(" ")[0]}
             <span className="wave">.</span>
@@ -205,11 +229,16 @@ export function Dashboard() {
                   </span>
                   <h3>{t.name}</h3>
                   <p>{t.description}</p>
-                  {t.trusted && (
-                    <span className="trusted">
-                      <ShieldCheck size={14} /> Trusted lender
+                  <div className="tool-lender">
+                    <span className="lender-name">
+                      Offered by {t.owner === me.subject ? "you" : t.ownerName}
                     </span>
-                  )}
+                    {t.trusted && (
+                      <span className="trusted">
+                        <ShieldCheck size={14} /> Trusted lender
+                      </span>
+                    )}
+                  </div>
                   <div className="card-actions">
                     {t.owner === me.subject ? (
                       <>
