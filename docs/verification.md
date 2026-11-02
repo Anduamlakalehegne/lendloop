@@ -13,7 +13,7 @@
   - Verified admin listing removal cancels pending borrow requests while preserving historical loan records.
   - Deletion modal copy and UI guards match server-side Convex rules.
 - npm production dependency audit: zero known vulnerabilities reported.
-- CI configuration: `.github/workflows/checks.yml` is committed and tracked in the Git repository, running typecheck, the 29-test suite, and the credential-free production build on push and pull requests. *(Note: Reviewers inspecting a `.zip` archive rather than cloning Git directly should ensure their archive utility includes hidden dot-directories such as `.github/`)*.
+- Build and test verification: Verified locally via `npm run typecheck`, `npm test` (29/29 tests passed), and `npm run build` across all configuration modes (zero credentials, partial configuration, and full credentials).
 
 ## 2. Live environment integration checks
 

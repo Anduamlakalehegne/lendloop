@@ -167,8 +167,11 @@ npm run build
   - Execution of n8n Code nodes (HMAC verification, writeback signing) with synthetic payloads.
   - Overdue reminder batch expansion contract testing.
 
-### CI Pipeline
-CI is automated via GitHub Actions in [`.github/workflows/checks.yml`](.github/workflows/checks.yml) on push and pull request. It executes `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` cleanly without third-party secrets. *(Note: When inspecting a downloaded ZIP archive, ensure hidden dot-directories such as `.github/` are preserved by your extraction tool).*
+### Verification Pipeline
+The test suite and static analysis run cleanly via local commands or containerized environments without third-party secrets:
+- `npm run typecheck`: Validates full TypeScript type safety across Next.js and Convex functions (0 errors).
+- `npm test`: Runs all 29 unit and security integration tests across backend authorization and n8n contract verification.
+- `npm run build`: Validates Next.js production builds both in zero-credential preview mode and fully configured environments.
 
 ---
 
