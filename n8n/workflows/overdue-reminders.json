@@ -1,0 +1,162 @@
+{
+  "name": "LendLoop \u00b7 Daily overdue reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5b71abf3-b617-41fd-a1c0-89738cbb103b",
+      "name": "Every day at 09 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.AUTOMATION_SECRET;\nif (!secret || secret.length < 32) throw new Error('Automation secret is not configured');\nconst timestamp = String(Date.now());\nconst payload = JSON.stringify({});\nconst signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');\nreturn [{json: {payload, timestamp, signature}}];"
+      },
+      "id": "7d58f98a-5b50-4452-9940-0357357aae53",
+      "name": "Sign overdue lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL + \"/automation/overdue\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "108b4311-0fe2-45e8-a2b3-6102efbd6d5d",
+      "name": "Fetch overdue reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all().flatMap(item => Array.isArray(item.json) ? item.json : (item.json.reminders ?? [item.json]));\nreturn rows.filter(r => typeof r.reminderId === 'string').map(r => ({json: r}));"
+      },
+      "id": "c98f0067-588c-42da-90ed-ac6c82cc0fbb",
+      "name": "Expand reminder batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.AUTOMATION_SECRET;\nif (!secret || secret.length < 32) throw new Error('Automation secret is not configured');\nconst timestamp = String(Date.now());\nconst payload = JSON.stringify({reminderId: $json.reminderId});\nconst signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');\nreturn {json: {payload, timestamp, signature}};"
+      },
+      "id": "fb9f4761-24ca-4031-bc15-0fb57a08e713",
+      "name": "Sign reminder writeback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL + \"/automation/complete\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "43b3c3c8-963c-4141-ae53-9457d386e31b",
+      "name": "Deliver mock reminder and record status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Every day at 09 UTC": {
+      "main": [
+        [
+          {
+            "node": "Sign overdue lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign overdue lookup": {
+      "main": [
+        [
+          {
+            "node": "Fetch overdue reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch overdue reminders": {
+      "main": [
+        [
+          {
+            "node": "Expand reminder batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand reminder batch": {
+      "main": [
+        [
+          {
+            "node": "Sign reminder writeback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign reminder writeback": {
+      "main": [
+        [
+          {
+            "node": "Deliver mock reminder and record status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "lendloop-errors"
+  },
+  "pinData": {},
+  "tags": []
+}

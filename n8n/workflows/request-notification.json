@@ -1,0 +1,131 @@
+{
+  "name": "LendLoop \u00b7 Request notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bb69c586-aa34-43ec-9f85-d890abf80195",
+      "name": "Borrow request webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "2d34e323-8d5f-48b3-abbc-aa82a2399468"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const crypto = require('crypto');\nconst e = $json.body;\nconst secret = $env.AUTOMATION_SECRET;\nif (!secret || secret.length < 32) throw new Error('Automation secret is not configured');\nif (!e || typeof e.payload !== 'string' || e.payload.length > 65536 || typeof e.timestamp !== 'string' || !/^\\d{13}$/.test(e.timestamp) || typeof e.signature !== 'string' || !/^[a-f0-9]{64}$/.test(e.signature) || Math.abs(Date.now() - Number(e.timestamp)) > 300000) throw new Error('Invalid or expired envelope');\nconst expected = crypto.createHmac('sha256', secret).update(`${e.timestamp}.${e.payload}`).digest();\nconst received = Buffer.from(e.signature, 'hex');\nif (!crypto.timingSafeEqual(expected, received)) throw new Error('Invalid signature');\nconst data = JSON.parse(e.payload);\nif (typeof data.eventId !== 'string') throw new Error('eventId required');\nreturn [{json: {eventId: data.eventId}}];"
+      },
+      "id": "a1d6ef04-9739-4ae7-bd12-da9ea414466c",
+      "name": "Verify signed event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.AUTOMATION_SECRET;\nif (!secret || secret.length < 32) throw new Error('Automation secret is not configured');\nconst timestamp = String(Date.now());\nconst payload = JSON.stringify({eventId: $json.eventId});\nconst signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');\nreturn [{json: {payload, timestamp, signature}}];"
+      },
+      "id": "7f3211bd-823d-4ba7-9099-c67bd39db669",
+      "name": "Sign notification writeback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL + \"/automation/event\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "077757e2-59a7-428f-b582-9858781fbc42",
+      "name": "Commit mock notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok: true} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "6ca7e0f6-a848-4ecf-843f-1683d577a4af",
+      "name": "Acknowledge delivery",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [960, 0]
+    }
+  ],
+  "connections": {
+    "Borrow request webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify signed event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signed event": {
+      "main": [
+        [
+          {
+            "node": "Sign notification writeback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign notification writeback": {
+      "main": [
+        [
+          {
+            "node": "Commit mock notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit mock notification": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "lendloop-errors"
+  },
+  "pinData": {},
+  "tags": []
+}

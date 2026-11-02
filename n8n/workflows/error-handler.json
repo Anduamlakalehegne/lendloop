@@ -1,0 +1,47 @@
+{
+  "name": "LendLoop \u00b7 Visible automation errors",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "476e116e-6c82-4461-bd09-2e04ed2d447b",
+      "name": "Workflow failed",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Never log input payloads, headers, signatures, or credentials.\nconst failure={workflow: $json.workflow?.name ?? 'Unknown workflow', executionId: $json.execution?.id ?? null, state: 'failed'};\nconsole.error('LendLoop automation failed', JSON.stringify(failure));\nreturn [{json: failure}];"
+      },
+      "id": "f0fbaea8-afcb-4442-8590-9121865fddc5",
+      "name": "Log sanitized failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    }
+  ],
+  "connections": {
+    "Workflow failed": {
+      "main": [
+        [
+          {
+            "node": "Log sanitized failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": [],
+  "id": "lendloop-errors"
+}
