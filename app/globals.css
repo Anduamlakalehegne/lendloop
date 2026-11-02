@@ -149,6 +149,14 @@ nav a:hover {
 .button.primary:hover {
   background: #1b4335;
 }
+.button.danger {
+  background: #b91c1c;
+  color: white;
+  border-color: #b91c1c;
+}
+.button.danger:hover {
+  background: #991b1b;
+}
 .button.small {
   padding: 10px 15px;
   font-size: 12px;

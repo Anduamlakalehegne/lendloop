@@ -33,7 +33,7 @@ export function Dashboard() {
     retry = useMutation(api.automation.retry);
   const [tab, setTab] = useState("Explore tools"),
     [category, setCategory] = useState("All tools"),
-    [modal, setModal] = useState<"listing" | "borrow" | null>(null),
+    [modal, setModal] = useState<"listing" | "borrow" | "delete" | null>(null),
     [selected, setSelected] = useState<Tool | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -65,7 +65,10 @@ export function Dashboard() {
       setBusy(false);
     }
   }
-  function open(kind: "listing" | "borrow", tool: Tool | null = null) {
+  function open(
+    kind: "listing" | "borrow" | "delete",
+    tool: Tool | null = null,
+  ) {
     setSelected(tool);
     setModal(kind);
     setError("");
@@ -220,17 +223,7 @@ export function Dashboard() {
                           className="icon-button"
                           aria-label={`Remove ${t.name}`}
                           disabled={busy}
-                          onClick={() => {
-                            if (
-                              confirm(
-                                "Remove this listing? Its loan history will be retained.",
-                              )
-                            )
-                              void run(
-                                () => remove({ id: t._id }),
-                                "Listing removed.",
-                              );
-                          }}
+                          onClick={() => open("delete", t)}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -406,14 +399,7 @@ export function Dashboard() {
               <button
                 className="button small"
                 disabled={busy}
-                onClick={() => {
-                  if (
-                    confirm(
-                      "Remove this listing? Pending requests will be cancelled and active loans retained in history.",
-                    )
-                  )
-                    void run(() => remove({ id: t._id }), "Listing removed.");
-                }}
+                onClick={() => open("delete", t)}
               >
                 Remove listing
               </button>
@@ -458,7 +444,65 @@ export function Dashboard() {
             if (!busy) setModal(null);
           }}
         >
-          <div className="modal">
+          {modal === "delete" ? (
+            <div className="modal">
+              <button
+                className="close icon-button"
+                aria-label="Close dialog"
+                disabled={busy}
+                onClick={() => setModal(null)}
+              >
+                <X size={22} />
+              </button>
+              <div className="eyebrow" style={{ color: "#b91c1c" }}>
+                CONFIRM REMOVAL
+              </div>
+              <h2 id="modal-title">Remove listing?</h2>
+              <p>
+                Are you sure you want to remove <strong>{selected?.name}</strong>?
+                Pending borrow requests will be cancelled, and active or past loan
+                records will be safely preserved in history.
+              </p>
+              {error && (
+                <div className="error" role="alert">
+                  {error}
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  marginTop: "24px",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  type="button"
+                  className="button"
+                  disabled={busy}
+                  onClick={() => setModal(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="button danger"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!selected) return;
+                    const ok = await run(
+                      () => remove({ id: selected._id }),
+                      "Listing removed.",
+                    );
+                    if (ok) setModal(null);
+                  }}
+                >
+                  {busy ? "Removing…" : "Remove listing"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="modal">
             <button
               className="close icon-button"
               aria-label="Close dialog"
@@ -599,6 +643,7 @@ export function Dashboard() {
               </button>
             </form>
           </div>
+          )}
         </dialog>
       )}
     </section>
