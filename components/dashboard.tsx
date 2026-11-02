@@ -13,6 +13,7 @@ import {
   Package,
   Pencil,
   Trash2,
+  Clock,
 } from "lucide-react";
 import { CategoryIcon } from "@/components/tool-icon";
 type Tool = Doc<"tools"> & {
@@ -296,12 +297,33 @@ export function Dashboard() {
                     {l.start} → {l.end}{" "}
                     <span className="muted">· UTC dates</span>
                   </p>
-                  {l.lastReminderAt > 0 && (
-                    <small>
-                      Last reminder:{" "}
-                      {new Date(l.lastReminderAt).toLocaleString()}
+                  {l.automationActivity ? (
+                    <small
+                      className="muted"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        marginTop: "4px",
+                      }}
+                    >
+                      <Clock size={12} /> {l.automationActivity.text}{" "}
+                      {formatTimeAgo(l.automationActivity.time)}
                     </small>
-                  )}
+                  ) : l.lastReminderAt > 0 ? (
+                    <small
+                      className="muted"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        marginTop: "4px",
+                      }}
+                    >
+                      <Clock size={12} /> Reminder sent{" "}
+                      {formatTimeAgo(l.lastReminderAt)}
+                    </small>
+                  ) : null}
                 </div>
                 <span className={`status status-${l.status}`}>
                   {l.status === "approved" &&
@@ -678,6 +700,19 @@ export function Dashboard() {
     </section>
   );
 }
+function formatTimeAgo(timestamp: number): string {
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "1 day ago";
+  return `${diffDays} days ago`;
+}
+
 function Empty({ text }: { text: string }) {
   return (
     <div className="empty">

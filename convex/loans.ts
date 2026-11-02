@@ -140,10 +140,48 @@ export const list = query({
             .query("reminders")
             .withIndex("by_loan", (q) => q.eq("loanId", l._id))
             .collect();
+          const events = await ctx.db
+            .query("events")
+            .withIndex("by_loan", (q) => q.eq("loanId", l._id))
+            .collect();
+          const sentReminders = reminders
+            .filter((r) => typeof r.sentAt === "number")
+            .sort((a, b) => (b.sentAt ?? 0) - (a.sentAt ?? 0));
+          const deliveredEvents = events
+            .filter(
+              (e) => e.state === "delivered" && typeof e.deliveredAt === "number",
+            )
+            .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0));
+
+          let automationActivity: { text: string; time: number } | undefined;
+          if (sentReminders.length > 0 && sentReminders[0].sentAt) {
+            automationActivity = {
+              text: "Reminder sent",
+              time: sentReminders[0].sentAt,
+            };
+          } else if (
+            deliveredEvents.length > 0 &&
+            deliveredEvents[0].deliveredAt
+          ) {
+            const kindText =
+              deliveredEvents[0].kind === "request.created"
+                ? "Request notification sent"
+                : deliveredEvents[0].kind === "request.approved"
+                  ? "Approval notification sent"
+                  : deliveredEvents[0].kind === "request.returned"
+                    ? "Return notification sent"
+                    : "Automation update sent";
+            automationActivity = {
+              text: kindText,
+              time: deliveredEvents[0].deliveredAt,
+            };
+          }
+
           return {
             ...l,
             toolName: t?.name ?? "Removed tool",
             lastReminderAt: Math.max(0, ...reminders.map((r) => r.sentAt ?? 0)),
+            automationActivity,
           };
         }),
     );

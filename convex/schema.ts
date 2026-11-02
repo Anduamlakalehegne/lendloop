@@ -48,7 +48,9 @@ export default defineSchema({
     attempts: v.number(),
     lastError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
-  }).index("by_state", ["state"]),
+  })
+    .index("by_loan", ["loanId"])
+    .index("by_state", ["state"]),
   reminders: defineTable({
     key: v.string(),
     loanId: v.id("loans"),
