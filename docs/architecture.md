@@ -22,7 +22,7 @@ Normal users can remove their own listing only after resolving pending/approved 
 
 ## Automation protocol
 
-An envelope contains `payload` (a JSON string), `timestamp` (Unix milliseconds), and `signature` (hex HMAC-SHA256 of `timestamp.payload`). Signing the exact payload string avoids cross-runtime JSON canonicalization differences. Both receivers verify signatures and reject clocks outside a five-minute window. Only HTTPS webhook delivery is allowed from Convex. Keep clocks synchronized.
+An envelope contains `payload` (a JSON string), `timestamp` (Unix milliseconds), and `signature` (hex HMAC-SHA256 of `timestamp.payload`). Signing the exact payload string avoids cross-runtime JSON canonicalization differences. Both receivers verify signatures and reject clocks outside a five-minute window. Webhook delivery from Convex enforces HTTPS for remote destinations (with loopback http://localhost and http://127.0.0.1 permitted for local Docker development). Keep clocks synchronized.
 
 Replay within that short window is harmless to notification delivery: each event is consumed once; each reminder uses a stable loan/UTC-day key. Replay resistance beyond expiry uses these business idempotency keys, rather than an in-memory nonce cache. Secrets have a minimum length, remain outside exported workflows, and must be generated with a cryptographic source.
 
