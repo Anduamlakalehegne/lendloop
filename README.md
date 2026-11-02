@@ -1,131 +1,203 @@
 # LendLoop
 
-**Borrow what you need. Lend what you don’t.**
+> **Borrow what you need. Lend what you don’t.**
 
-A neighborhood lending board built for the Fluence take-home assignment using **Next.js App Router, TypeScript, Clerk, Convex, and self-hosted n8n**.
+A neighborhood tool-lending co-op platform built for the Fluence take-home assignment using **Next.js App Router, TypeScript, Clerk, Convex, and self-hosted n8n**.
 
-## Current verification status
+---
 
-- Next.js production build and strict TypeScript check pass without service credentials.
-- Backend security and booking behavior are exercised with `convex-test`; signed envelopes and workflow Code nodes are tested locally.
-- The public design preview runs without credentials and explicitly labels its sample listings. It does not provide fake authentication or bypass Convex.
-- Live Clerk sessions, a deployed Convex backend, Docker/n8n import and execution, and the authenticated browser journey still require real service configuration. Do not represent the project as end-to-end verified until the manual checklist below passes.
-- Notifications deliberately use the assignment’s permitted **logged mock** option: n8n triggers durable, private in-app notification records, rather than sending real email. A notification and its delivery status commit atomically in Convex.
+## Architecture Overview
 
-## Quick start
+```mermaid
+flowchart TD
+  subgraph Client ["Frontend · Next.js 16 (App Router)"]
+    A["Public Board (Name & Category Only)"]
+    B["Authenticated Dashboard (Clerk Auth)"]
+  end
 
-Requirements: Node.js 22 or newer, npm, Docker Compose, and Clerk + Convex accounts.
+  subgraph Backend ["Convex Backend & Data Store"]
+    C["Convex Server Queries & Mutations\n(Server-Enforced RBAC)"]
+    D["Outbox Event Dispatcher\n(HMAC-SHA256 Signing)"]
+    E["HTTP Endpoint (/automation/*)\n(Signature Verification)"]
+  end
 
+  subgraph Automation ["n8n (Self-Hosted via Docker)"]
+    F["Request Notification Webhook\n(/webhook/lendloop-request)"]
+    G["Daily Overdue Reminders\n(09:00 UTC Cron)"]
+    H["Sanitized Error Handler"]
+  end
+
+  A -->|Anonymous Read| C
+  B -->|Authenticated Identity| C
+  C -->|Dispatch Webhook| D
+  D -->|Signed Envelope| F
+  F -->|Signed Acknowledgment Writeback| E
+  E -->|Atomic Delivery Commit| C
+  G -->|Signed Batch Fetch & Writeback| E
+  F -.->|On Failure| H
+  G -.->|On Failure| H
+```
+
+---
+
+## Quick Start (Local Setup)
+
+### Prerequisites
+- **Node.js**: `22.x` or newer and `npm`
+- **Docker & Docker Compose**: For self-hosted n8n
+- **Clerk & Convex accounts**: For live authentication and real-time backend
+
+### 1. Install & Launch Preview
 ```bash
+git clone <your-repo-url>
+cd lendloop
 npm ci
 cp .env.example .env.local
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000). When launched without environment credentials, the application runs in a standalone preview mode with curated sample tools. Full lending workflows and authentication activate once Clerk and Convex credentials are provided.
 
-Open `http://localhost:3000`. Without keys, you see the clearly labeled public design preview. Do not deploy that preview as your completed assignment.
+---
 
-### 1. Connect Clerk and Convex
+### 2. Configure Clerk & Convex
 
-1. Create a Clerk application with email authentication. Copy the publishable and secret keys into `.env.local`.
-2. In Clerk, create a JWT template named **convex**, using the Convex template. Copy its issuer domain.
-3. Run `npx convex dev`. Follow the interactive account/deployment setup. Keep it running while developing; it refreshes the checked-in bootstrap API types and watches Convex functions.
-4. Set `NEXT_PUBLIC_CONVEX_URL` in `.env.local` to your deployment’s `.convex.cloud` URL.
-5. In Convex deployment environment settings, set:
-   - `CLERK_JWT_ISSUER_DOMAIN`: the Clerk issuer URL.
-   - `ADMIN_SUBJECTS`: comma-separated Clerk user IDs for your administrators. These are **not emails or client-submitted roles**. Use a separate admin test account.
-   - `AUTOMATION_SECRET`: at least 32 cryptographically random characters. Generate locally with `openssl rand -hex 32` (or a secure password generator). Must match in Convex and n8n.
-   - `N8N_REQUEST_WEBHOOK_URL`: the active n8n webhook URL, ending in `/webhook/lendloop-request` (HTTPS required for remote production; HTTP `localhost` / `127.0.0.1` permitted for local development).
-6. Restart Next.js after changing public environment variables, and let `npx convex dev` sync the authentication configuration.
+1. **Clerk Setup**:
+   - Create a Clerk application with email authentication.
+   - Copy `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` into `.env.local`.
+   - In Clerk, create a JWT Template named **`convex`** (using the Convex template). Copy the **Issuer URL**.
+2. **Convex Setup**:
+   - Run `npx convex dev` to initialize your local or cloud deployment.
+   - Set `NEXT_PUBLIC_CONVEX_URL` in `.env.local` to your deployment's client URL (`.convex.cloud` or `http://127.0.0.1:3210`).
+   - In Convex deployment environment settings (`npx convex env set` or via Convex dashboard):
+     ```bash
+     npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-clerk-issuer.clerk.accounts.dev"
+     npx convex env set ADMIN_SUBJECTS "user_clerk_id_1,user_clerk_id_2"
+     npx convex env set AUTOMATION_SECRET "your_random_secret_at_least_32_characters_long"
+     npx convex env set N8N_REQUEST_WEBHOOK_URL "http://localhost:5678/webhook/lendloop-request"
+     ```
+   *(Note: `AUTOMATION_SECRET` must be at least 32 characters to prevent brute-force forgery. Use `openssl rand -hex 32` to generate one).*
 
-All non-public queries and mutations independently check the Convex authenticated identity. Clerk UI visibility is not a security boundary. Without a configured issuer, authentication fails closed.
+---
 
-### 2. Start n8n
+### 3. Start n8n (Docker)
 
-Docker Compose reads **`.env`**, not `.env.local`. Create an ignored `.env` containing only:
+Docker Compose reads **`.env`** (not `.env.local`). Create an ignored `.env` in the repository root:
 
 ```dotenv
-CONVEX_SITE_URL=http://host.docker.internal:3211 # Use https://YOUR-DEPLOYMENT.convex.site for hosted Convex
-AUTOMATION_SECRET=YOUR_RANDOM_SHARED_SECRET_AT_LEAST_32_CHARS
-N8N_ENCRYPTION_KEY=ANOTHER_LONG_RANDOM_SECRET
+CONVEX_SITE_URL=http://host.docker.internal:3211
+AUTOMATION_SECRET=your_random_secret_at_least_32_characters_long
+N8N_ENCRYPTION_KEY=another_long_random_stable_encryption_key
 ```
 
-Use the exact same `AUTOMATION_SECRET` on Convex and n8n (minimum 32 characters enforced). Keep the encryption key stable across container restarts. The `.convex.site` URL is for HTTP actions; `.convex.cloud` is the React client URL.
+*Notes:*
+- `CONVEX_SITE_URL`: Use `http://host.docker.internal:3211` for local Convex dev accessed from inside the Docker container, or `https://<deployment>.convex.site` for hosted Convex.
+- `AUTOMATION_SECRET`: Must match the exact value configured in Convex.
+- `N8N_ENCRYPTION_KEY`: Keep stable across container restarts to preserve workflow encryption.
 
+Launch the container:
 ```bash
 docker compose up -d
 ```
+Open [http://localhost:5678](http://localhost:5678) and complete initial owner onboarding.
 
-Open `http://localhost:5678` and complete n8n owner setup. The editor binds only to loopback. For incoming Convex calls, provide a controlled HTTPS endpoint/reverse proxy for the production **webhook path**, keeping the editor private. A cloud Convex deployment cannot reach your laptop’s localhost. Set n8n’s `WEBHOOK_URL` to the external HTTPS origin when using a reverse proxy, and configure the proxy according to n8n’s documentation.
+---
 
-The pinned n8n image uses the built-in task runner. Code nodes require the `crypto` module and environment access; Compose explicitly permits these. Only trusted operators should edit workflows. This project chooses self-hosted n8n; n8n Cloud environment/credential handling needs adaptation.
+### 4. Import n8n Workflows
 
-### 3. Import the workflows
+In n8n, choose **Import from File** (or workflows directory) for each file in `n8n/workflows/`:
+1. `error-handler.json` (**LendLoop · Visible automation errors**)
+2. `request-notification.json` (**LendLoop · Request notifications**)
+3. `overdue-reminders.json` (**LendLoop · Daily overdue reminders**)
 
-Import the three JSON files from `n8n/workflows/` using n8n’s **Import from file**:
+In both main workflows, set **Error Workflow** to `LendLoop · Visible automation errors` in Workflow Settings, and toggle them to **Active / Published**.
 
-1. `error-handler.json`
-2. `request-notification.json`
-3. `overdue-reminders.json`
+---
 
-For each of the two main workflows, open Settings and explicitly select **LendLoop · Visible automation errors** as its error workflow. Imported IDs can change between instances; do not rely on the exported ID alone. Publish/activate both main workflows (wording depends on n8n version). Error Trigger runs on production failures, not ordinary manual test executions.
+## Security & Data-Minimization Decisions
 
-Use the production webhook URL, not `/webhook-test/`. The webhook acknowledges only after the signed Convex callback commits. HTTP nodes retry three times. Convex also retries request delivery with exponential backoff, up to five failed attempts; exhausted events appear in Admin and can be retried.
+1. **Strict Data Minimization on Public Pages:**
+   - The public `/` endpoint queries `api.tools.publicList`, which projects **strictly `name` and `category`** (`map(t => ({ name: t.name, category: t.category }))`).
+   - Owner IDs, borrower names, contact details, and dates are completely excluded from public payloads to prevent scraping and protect neighbor privacy.
+2. **Server-Side RBAC Enforcement in Convex:**
+   - Role checks are **never** trusted from client parameters or UI state.
+   - All mutations and queries verify identity via `ctx.auth.getUserIdentity()`.
+   - Admin privileges are verified against a server-controlled `ADMIN_SUBJECTS` list.
+   - Members can only modify or delete their own tools and loans.
+   - Listing removal: Ordinary members are blocked if unresolved borrow requests or active loans exist on the tool. Only administrators can force-archive listings with active loans while safely preserving historical returns.
+3. **Signed HMAC-SHA256 Automation Envelopes:**
+   - Outgoing and incoming automation payloads are signed with HMAC-SHA256 over timestamped JSON (`timestamp.payload`).
+   - Replay protection: Signatures expire after 5 minutes (`300,000 ms`).
+   - Secrets are cryptographically enforced to be &ge; 32 characters in `lib/signatures.ts`.
+   - Webhook payloads contain opaque identifiers only (e.g. `eventId`, `loanId`). Personal borrower details, emails, and tokens are never broadcast to the automation runner.
+4. **Tightened Webhook Destination Validation:**
+   - [`convex/delivery.ts`](convex/delivery.ts) uses `new URL()` validation.
+   - Remote production destinations strictly require `https:`. Plain `http:` is permitted only on exact loopback hostnames (`localhost` or `127.0.0.1`), eliminating substring/domain spoofing risks.
+5. **Idempotent Delivery & Retry Engine:**
+   - Webhook dispatches use an outbox pattern in Convex with exponential backoff (up to 5 retries).
+   - Exhausted attempts are captured and flagged as `failed` with visible error details and manual "Deliver now" / "Retry" controls in the Admin panel, preventing silent failures.
+   - Daily overdue reminders deduplicate writebacks per loan per day (`key: ${loanId}:${day}`).
 
-The overdue workflow runs at **09:00 UTC daily**. It fetches opaque business identifiers inside signed envelopes, then calls a signed completion endpoint for each reminder. A manual run is useful for review. Empty batches stop naturally. Errors remain visible in n8n executions and the error workflow writes only sanitized metadata to the container logs.
+---
 
-Successful execution payloads are not retained; failed executions are retained for seven days. Envelopes contain opaque event/reminder IDs and signatures, not names, email addresses, tool descriptions, or authentication tokens.
+## Testing & Quality Assurance
 
-## Available experiences
-
-- **Anonymous:** live Convex list of currently available tools, exposing exactly name/category, plus Clerk modal sign-in.
-- **Member:** category filtering, availability, listing creation/editing/removal, borrow date requests, incoming requests, approval/decline, lender-confirmed return, pending-request cancellation, notifications, and recent reminder time on loans.
-- **Admin:** all loans, any-listing removal, trusted-lender controls, delivery activity, and failed-event retry. Archiving a listing retains loan history and cancels pending requests with notifications. Active loans remain returnable.
-
-## Architecture
-
-```mermaid
-flowchart TD
-  B["Browser"] --> C["Clerk identity"]
-  C --> D["Convex permissions and loans"]
-  D --> E["n8n request webhook"]
-  E --> F["Convex private notifications"]
-  G["n8n daily schedule"] --> H["Convex overdue lookup"]
-  H --> F
-```
-
-See `docs/architecture.md` for decisions and `docs/production.md` for production changes.
-
-## Validation
+Run the test suite and typechecks locally without needing live credentials:
 
 ```bash
+# Typecheck
 npm run typecheck
+
+# Automated Vitest Suite (29 tests)
 npm test
+
+# Production Build (Verifies credential-free prerendering)
 npm run build
 ```
 
-`convex-test` exercises the actual Convex functions against the real schema with independent identities. 29 automated tests cover anonymous field projection, unauthorized access, booking races, invalid transitions, archival, delivery deduplication, overdue reminder deduplication, signature expiry/tampering, webhook URL validation, and the signed HTTP boundary. Workflow tests execute the exported JavaScript signing/verification nodes with n8n-shaped inputs.
+### Coverage Summary (29 Tests across 2 Suites)
+- **`tests/security.test.ts` (26 tests)**:
+  - Anonymous projection and field minimization.
+  - Server-side RBAC: member isolation, unauthorized edit/delete rejection, admin moderation rights.
+  - Concurrent loan approval serialization and overlapping booking race prevention.
+  - Member vs Admin listing removal permissions with active loans.
+  - Tampered, expired, and invalid HMAC signature rejection.
+  - Webhook URL destination parsing, remote HTTPS enforcement, and loopback spoofing rejection.
+- **`tests/workflows.test.ts` (3 tests)**:
+  - Verification that exported n8n workflow JSON files contain zero embedded secrets.
+  - Execution of n8n Code nodes (HMAC verification, writeback signing) with synthetic payloads.
+  - Overdue reminder batch expansion contract testing.
 
-CI (`.github/workflows/checks.yml`) is tracked in Git and runs the exact same checks on push and pull requests without requiring external credentials. *(Note: If reviewing an unzipped archive, ensure hidden dot-directories such as `.github/` are preserved by your extraction tool)*.
+### CI Pipeline
+CI is automated via GitHub Actions in [`.github/workflows/checks.yml`](.github/workflows/checks.yml) on push and pull request. It executes `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` cleanly without third-party secrets. *(Note: When inspecting a downloaded ZIP archive, ensure hidden dot-directories such as `.github/` are preserved by your extraction tool).*
 
-### Acceptance checklist
+---
 
-The automated suite verifies the backend contract, security boundaries, and signing logic. Live manual verification checks performed in the development environment:
+## Role-Based Access for Evaluators
 
-- [x] Deploy Convex with the Clerk issuer, admin subjects, and automation settings.
-- [x] Sign in as member A and list a tool. Sign out: the public response exposes only its name/category.
-- [x] Sign in as member B; request dates. Confirm B cannot edit A’s listing or approve the request through direct Convex calls.
-- [x] A approves; B sees the update and receives the n8n-triggered mock notification. A confirms return.
-- [x] Sign in as admin; mark A trusted and verify B sees the badge. Remove a listing and verify history is retained.
-- [x] Run overdue reminder workflow; verify idempotent duplicate prevention and reminder activity timestamps in the app.
-- [x] Send a tampered signed envelope: verified rejection by HMAC verification nodes and endpoints.
-- [x] Inspect retry behavior on webhook delivery failures and verify Admin "Deliver now" / "Retry".
-- [x] Confirm error-handler workflow captures errors and logs sanitized execution metadata.
-- [x] Test keyboard navigation, modal focus/escape, accessible dialogs, and narrow viewports.
+1. **Member View:**
+   Sign in with any Clerk account. You can list tools, request borrow dates on neighborhood listings, approve/decline incoming requests, confirm returns, and see relative automation activity (e.g., `🕒 Approval notification sent just now`).
+2. **Admin View:**
+   To elevate an account to Administrator, obtain your Clerk User ID (displayed on the dashboard role pill) and run:
+   ```bash
+   npx convex env set ADMIN_SUBJECTS "user_YOUR_CLERK_ID"
+   ```
+   Refresh the page. The **Admin** tab immediately unlocks, allowing you to:
+   - Mark/unmark neighbors as **Trusted Lender**.
+   - Moderate and remove any neighborhood listing.
+   - Audit all loans across the entire community.
+   - Inspect webhook delivery logs and trigger manual retries.
 
-## Submission
+---
 
-Push the source, lockfile, workflow JSON exports, Compose configuration, and docs to your own GitHub repository. Never push `.env`, `.env.local`, generated credentials, n8n volumes, or bank data. Deploy Next.js on a compatible Node.js host (for example Vercel) with Clerk keys and Convex URL; deploy Convex separately and keep n8n reachable over HTTPS. Set `NEXT_PUBLIC_*` values before the production build because Next.js embeds them into client bundles.
+## What I Would Change for Production
 
-The repository is intentionally standard Next.js rather than a substitute framework/runtime. A repository archive is provided for import into your GitHub account; no GitHub repository or live service accounts are created automatically.
-
-Use `docs/reviewer-guide.md` for the technical walkthrough.
+1. **Transactional Email Transport:**
+   The assignment permits logged mock notifications. In production, n8n would integrate with a transactional email provider (such as Resend or Postmark) using provider-level idempotency keys (`Idempotency-Key: event_${id}`) to guarantee that network retries never send duplicate emails to neighbors.
+2. **Reverse Proxy & Domain Isolation:**
+   Host n8n behind an HTTPS reverse proxy (e.g. Caddy, Cloudflare, or AWS ALB) with mutual TLS or IP allowlisting between Convex and n8n. Keep the n8n management UI completely private on a corporate VPN while exposing only `/webhook/*` publicly.
+3. **Pagination & Compound Indexing:**
+   Paginate public and authenticated tool queries using Convex cursor-based pagination (`.paginate()`) to handle thousands of neighborhood tools efficiently.
+4. **Key Rotation & Secrets Management:**
+   Use AWS Secrets Manager, Doppler, or HashiCorp Vault to rotate the `AUTOMATION_SECRET` and Clerk keys with dual-secret grace periods during rotation.
+5. **Auditing & Telemetry:**
+   Add a dedicated immutable `audit_logs` table in Convex recording all administrative moderation events, trust status changes, and listing deletions for compliance and safety.
